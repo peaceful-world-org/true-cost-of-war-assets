@@ -1,0 +1,72 @@
+name: Import current production loaders
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/import-current-assets.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  import:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out assets repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Import approved production loaders
+        shell: bash
+        run: |
+          set -euo pipefail
+          release="prod-2026-09-13-a"
+          source_commit="4147a3bfee8b3a25a5f60a97b2d02cc106cb5037"
+          source_base="https://cdn.jsdelivr.net/gh/peaceful-world-org/true-cost-of-war@${source_commit}"
+          out="releases/${release}"
+          mkdir -p "$out"
+
+          languages=(en ru ukr es ar hi fr pt fa de zh-CN)
+          for lang in "${languages[@]}"; do
+            echo "Importing ${lang}-loader.js"
+            curl --fail --location --retry 3 --retry-delay 2 \
+              "${source_base}/${lang}-loader.js" \
+              --output "${out}/${lang}-loader.js"
+            test "$(wc -c < "${out}/${lang}-loader.js")" -gt 10000
+          done
+
+          cat > release.json <<JSON
+          {
+            "schemaVersion": 1,
+            "release": "${release}",
+            "sourceCommit": "${source_commit}",
+            "loaders": {
+              "en": "https://cdn.jsdelivr.net/gh/peaceful-world-org/true-cost-of-war-assets@${release}/releases/${release}/en-loader.js",
+              "ru": "https://cdn.jsdelivr.net/gh/peaceful-world-org/true-cost-of-war-assets@${release}/releases/${release}/ru-loader.js",
+              "ukr": "https://cdn.jsdelivr.net/gh/peaceful-world-org/true-cost-of-war-assets@${release}/releases/${release}/ukr-loader.js",
+              "es": "https://cdn.jsdelivr.net/gh/peaceful-world-org/true-cost-of-war-assets@${release}/releases/${release}/es-loader.js",
+              "ar": "https://cdn.jsdelivr.net/gh/peaceful-world-org/true-cost-of-war-assets@${release}/releases/${release}/ar-loader.js",
+              "hi": "https://cdn.jsdelivr.net/gh/peaceful-world-org/true-cost-of-war-assets@${release}/releases/${release}/hi-loader.js",
+              "fr": "https://cdn.jsdelivr.net/gh/peaceful-world-org/true-cost-of-war-assets@${release}/releases/${release}/fr-loader.js",
+              "pt": "https://cdn.jsdelivr.net/gh/peaceful-world-org/true-cost-of-war-assets@${release}/releases/${release}/pt-loader.js",
+              "fa": "https://cdn.jsdelivr.net/gh/peaceful-world-org/true-cost-of-war-assets@${release}/releases/${release}/fa-loader.js",
+              "de": "https://cdn.jsdelivr.net/gh/peaceful-world-org/true-cost-of-war-assets@${release}/releases/${release}/de-loader.js",
+              "zh-CN": "https://cdn.jsdelivr.net/gh/peaceful-world-org/true-cost-of-war-assets@${release}/releases/${release}/zh-CN-loader.js"
+            }
+          }
+          JSON
+
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add release.json releases/
+          if git diff --cached --quiet; then
+            echo 'No asset changes to commit.'
+            exit 0
+          fi
+          git commit -m "Import current production loaders"
+          git tag -f "$release"
+          git push origin HEAD:main
+          git push origin "refs/tags/${release}" --force
