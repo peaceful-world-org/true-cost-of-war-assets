@@ -1,0 +1,18 @@
+{
+  "schemaVersion": 1,
+  "release": "prod-2026-09-13-a",
+  "sourceCommit": "4147a3bfee8b3a25a5f60a97b2d02cc106cb5037",
+  "loaders": {
+    "en": "https://cdn.jsdelivr.net/gh/peaceful-world-org/true-cost-of-war-assets@prod-2026-09-13-a/releases/prod-2026-09-13-a/en-loader.js",
+    "ru": "https://cdn.jsdelivr.net/gh/peaceful-world-org/true-cost-of-war-assets@prod-2026-09-13-a/releases/prod-2026-09-13-a/ru-loader.js",
+    "ukr": "https://cdn.jsdelivr.net/gh/peaceful-world-org/true-cost-of-war-assets@prod-2026-09-13-a/releases/prod-2026-09-13-a/ukr-loader.js",
+    "es": "https://cdn.jsdelivr.net/gh/peaceful-world-org/true-cost-of-war-assets@prod-2026-09-13-a/releases/prod-2026-09-13-a/es-loader.js",
+    "ar": "https://cdn.jsdelivr.net/gh/peaceful-world-org/true-cost-of-war-assets@prod-2026-09-13-a/releases/prod-2026-09-13-a/ar-loader.js",
+    "hi": "https://cdn.jsdelivr.net/gh/peaceful-world-org/true-cost-of-war-assets@prod-2026-09-13-a/releases/prod-2026-09-13-a/hi-loader.js",
+    "fr": "https://cdn.jsdelivr.net/gh/peaceful-world-org/true-cost-of-war-assets@prod-2026-09-13-a/releases/prod-2026-09-13-a/fr-loader.js",
+    "pt": "https://cdn.jsdelivr.net/gh/peaceful-world-org/true-cost-of-war-assets@prod-2026-09-13-a/releases/prod-2026-09-13-a/pt-loader.js",
+    "fa": "https://cdn.jsdelivr.net/gh/peaceful-world-org/true-cost-of-war-assets@prod-2026-09-13-a/releases/prod-2026-09-13-a/fa-loader.js",
+    "de": "https://cdn.jsdelivr.net/gh/peaceful-world-org/true-cost-of-war-assets@prod-2026-09-13-a/releases/prod-2026-09-13-a/de-loader.js",
+    "zh-CN": "https://cdn.jsdelivr.net/gh/peaceful-world-org/true-cost-of-war-assets@prod-2026-09-13-a/releases/prod-2026-09-13-a/zh-CN-loader.js"
+  }
+}
