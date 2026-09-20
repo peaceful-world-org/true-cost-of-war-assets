@@ -447,12 +447,11 @@ jobs:
           grep -q 'id="pw-tcow-parent-session-counter"' /tmp/tilda.dom && echo 'PASS parent session counter inserted'
           grep -q 'ЗА ВРЕМЯ ПРОСМОТРА' /tmp/tilda.dom && echo 'PASS session counter explanatory label'
           grep -q 'мировые военные расходы · средний темп 2025' /tmp/tilda.dom && echo 'PASS session counter methodology note'
-          grep -q '≈ \
+          grep -q '≈' /tmp/tilda.dom && echo 'PASS approximate-value marker'
           grep -q 'data-pw-live-visible="true"' /tmp/tilda.dom && echo 'PASS session counter follows parent scroll'
           grep -Eq 'data-pw-live-value="[1-9][0-9]*"' /tmp/tilda.dom && echo 'PASS session counter advances'
 
           echo "PASS: RC loader preserves host shell, auto-resize, parent navigation and continuous floating session counter"
- /tmp/tilda.dom && echo 'PASS approximate-value marker'
           grep -q 'data-pw-live-visible="true"' /tmp/tilda.dom && echo 'PASS session counter follows parent scroll'
           grep -Eq 'data-pw-live-value="[1-9][0-9]*"' /tmp/tilda.dom && echo 'PASS session counter advances'
 
