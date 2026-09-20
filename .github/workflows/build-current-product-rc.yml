@@ -20,8 +20,8 @@ jobs:
     timeout-minutes: 10
 
     env:
-      SOURCE_COMMIT: c711ef8b36d0d121efd45f73c7591306917ec34f
-      RC_RELEASE: rc-2026-09-20-current-product-c
+      SOURCE_COMMIT: 8b4f8e207cdef84a3958953fb37954a7c3816283
+      RC_RELEASE: rc-2026-09-20-current-product-d
       PRODUCT_ORIGIN: https://peaceful-world-org.github.io
       PRODUCT_BASE: https://peaceful-world-org.github.io/true-cost-of-war
 
@@ -52,6 +52,9 @@ jobs:
             const lang=current?.dataset?.lang||'en';
             if(!['en','ru'].includes(lang)) throw new Error('Current-product RC supports EN/RU only');
 
+            const overviewSrc=__OVERVIEW__;
+            const detailsSrc=__DETAILS__;
+
             const iframe=document.createElement('iframe');
             iframe.id='pw-tcow-current-product-rc';
             iframe.dataset.pwTcowRc=lang;
@@ -69,6 +72,82 @@ jobs:
               display:'block'
             });
 
+            const chromeStyle=document.createElement('style');
+            chromeStyle.id='pw-tcow-parent-view-switch-style';
+            chromeStyle.textContent=`
+              #pw-tcow-parent-view-switch{
+                position:fixed;top:50%;right:-48px;z-index:999999;
+                display:flex;align-items:center;gap:2px;padding:3px;
+                border:1px solid rgba(201,196,184,.86);border-radius:999px;
+                background:rgba(255,254,251,.94);box-shadow:0 6px 20px rgba(24,26,23,.09);
+                backdrop-filter:blur(12px);opacity:0;pointer-events:none;
+                transform:translateY(-50%) rotate(90deg) scale(.97);
+                transform-origin:center;transition:opacity .16s ease,transform .16s ease,box-shadow .16s ease;
+              }
+              #pw-tcow-parent-view-switch.is-visible{
+                opacity:1;pointer-events:auto;transform:translateY(-50%) rotate(90deg) scale(1);
+              }
+              #pw-tcow-parent-view-switch button{
+                min-width:72px;min-height:30px;padding:6px 10px;border:0;border-radius:999px;
+                background:transparent;color:#505149;font:750 11px/1.2 Inter,system-ui,sans-serif;
+                cursor:pointer;white-space:nowrap;
+              }
+              #pw-tcow-parent-view-switch button[aria-pressed="true"]{background:#1f231f;color:#fff}
+              #pw-tcow-parent-view-switch button:hover{background:#eeece5;color:#181a17}
+              #pw-tcow-parent-view-switch button[aria-pressed="true"]:hover{background:#1f231f;color:#fff}
+              @media(max-width:980px){
+                #pw-tcow-parent-view-switch{top:auto;right:auto;left:50%;
+                  bottom:calc(12px + env(safe-area-inset-bottom,0px));
+                  max-width:calc(100vw - 20px);
+                  transform:translate(-50%,10px) scale(.98)}
+                #pw-tcow-parent-view-switch.is-visible{transform:translate(-50%,0) scale(1)}
+                #pw-tcow-parent-view-switch button{min-width:82px;font-size:11px}
+              }
+              @media(prefers-reduced-motion:reduce){#pw-tcow-parent-view-switch{transition:none}}
+            `;
+            document.head.appendChild(chromeStyle);
+
+            const viewSwitch=document.createElement('nav');
+            viewSwitch.id='pw-tcow-parent-view-switch';
+            viewSwitch.dataset.pwViewSwitch='true';
+            viewSwitch.setAttribute('aria-label',lang==='ru'?'Режим просмотра':'View mode');
+
+            function makeViewButton(view,label){
+              const button=document.createElement('button');
+              button.type='button';
+              button.dataset.view=view;
+              button.textContent=label;
+              button.addEventListener('click',()=>{
+                setActiveView(view);
+                iframe.src=view==='details'?detailsSrc:overviewSrc;
+              });
+              viewSwitch.appendChild(button);
+              return button;
+            }
+
+            const overviewButton=makeViewButton('overview',lang==='ru'?'Обзор':'Overview');
+            const detailsButton=makeViewButton('details',lang==='ru'?'Подробнее':'Details');
+
+            function setActiveView(view){
+              const normalized=view==='details'?'details':'overview';
+              viewSwitch.dataset.pwActiveView=normalized;
+              overviewButton.setAttribute('aria-pressed',String(normalized==='overview'));
+              detailsButton.setAttribute('aria-pressed',String(normalized==='details'));
+            }
+            setActiveView('overview');
+
+            function syncFloatingVisibility(){
+              const rect=iframe.getBoundingClientRect();
+              const passedTop=rect.top < -110;
+              const overlapsViewport=rect.bottom > 120 && rect.top < (window.innerHeight-80);
+              const visible=passedTop && overlapsViewport;
+              viewSwitch.classList.toggle('is-visible',visible);
+              viewSwitch.dataset.pwFloatingVisible=String(visible);
+            }
+
+            window.addEventListener('scroll',syncFloatingVisibility,{passive:true});
+            window.addEventListener('resize',syncFloatingVisibility,{passive:true});
+
             function onMessage(event){
               if(event.origin!==__ORIGIN__) return;
               iframe.dataset.pwMessageOrigin='matched';
@@ -78,6 +157,10 @@ jobs:
                 return;
               }
               iframe.dataset.pwMessageSource='matched';
+              if(event.data?.type==='pw2-view'){
+                setActiveView(event.data.view);
+                return;
+              }
               if(event.data?.type!=='pw2-resize') return;
               const height=Number(event.data.height);
               if(!Number.isFinite(height)||height<100){
@@ -87,40 +170,48 @@ jobs:
               iframe.style.height=Math.ceil(height)+'px';
               iframe.dataset.pwResize=String(Math.ceil(height));
               iframe.dataset.pwResizeStatus='received';
+              syncFloatingVisibility();
             }
             window.addEventListener('message',onMessage);
 
-            function requestResize(){
+            function requestState(){
               try{
                 iframe.contentWindow?.postMessage({type:'pw2-request-resize'},__ORIGIN__);
+                iframe.contentWindow?.postMessage({type:'pw2-request-view'},__ORIGIN__);
               }catch(_){}
             }
 
             iframe.addEventListener('load',()=>{
               iframe.dataset.pwLoad='true';
-              requestResize();
-              setTimeout(requestResize,150);
-              setTimeout(requestResize,600);
+              requestState();
+              setTimeout(requestState,150);
+              setTimeout(requestState,600);
+              setTimeout(syncFloatingVisibility,0);
             });
 
-            iframe.src=__SRC__;
+            iframe.src=overviewSrc;
 
             const anchor=current||document.body.lastChild;
             if(anchor?.parentNode) anchor.parentNode.insertBefore(iframe,anchor);
             else document.body.appendChild(iframe);
+            document.body.appendChild(viewSwitch);
 
-            setTimeout(requestResize,1200);
-            setTimeout(requestResize,3000);
+            syncFloatingVisibility();
+            setTimeout(requestState,1200);
+            setTimeout(requestState,3000);
+            setTimeout(syncFloatingVisibility,300);
           })();
           """
 
           commit = repr(os.environ["SOURCE_COMMIT"])
           origin_js = repr(origin)
           for lang in ("en", "ru"):
-              src = f"{product_base}/unified/product.html?lang={lang}&embed=1"
+              overview = f"{product_base}/unified/product.html?lang={lang}&embed=1"
+              details = f"{product_base}/model-v2-lab/index.html?lang={lang}&embed=1"
               code = (
                   template
-                  .replace("__SRC__", repr(src))
+                  .replace("__OVERVIEW__", repr(overview))
+                  .replace("__DETAILS__", repr(details))
                   .replace("__ORIGIN__", origin_js)
                   .replace("__COMMIT__", commit)
               )
@@ -203,8 +294,12 @@ jobs:
           <!doctype html>
           <html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
           <body>
-            <div id="tilda-shell-sentinel">Tilda shell sentinel</div>
+            <div id="tilda-shell-sentinel" style="height:140px">Tilda shell sentinel</div>
             <script data-lang="ru" src="$base/ru-loader.js"></script>
+            <script>
+              setTimeout(()=>window.scrollTo(0,1200),5000);
+              setTimeout(()=>document.querySelector('#pw-tcow-parent-view-switch button[data-view="details"]')?.click(),7500);
+            </script>
           </body></html>
           HTML
 
@@ -216,7 +311,7 @@ jobs:
           browser="$(command -v google-chrome || command -v google-chrome-stable || command -v chromium || command -v chromium-browser)"
           "$browser" --headless=new --no-sandbox --disable-gpu --disable-dev-shm-usage \
             --disable-background-networking --hide-scrollbars --window-size=390,1000 \
-            --virtual-time-budget=12000 --dump-dom \
+            --virtual-time-budget=16000 --dump-dom \
             http://127.0.0.1:8765/tilda-host.html > /tmp/tilda.dom
 
           echo "---- rendered iframe ----"
@@ -230,5 +325,9 @@ jobs:
           grep -q 'data-pw-message-source="matched"' /tmp/tilda.dom && echo 'PASS child message source'
           grep -q 'data-pw-resize-status="received"' /tmp/tilda.dom && echo 'PASS resize message'
           grep -q 'data-pw-resize=' /tmp/tilda.dom && echo 'PASS resize height'
+          grep -q 'id="pw-tcow-parent-view-switch"' /tmp/tilda.dom && echo 'PASS parent view switch inserted'
+          grep -q 'data-pw-floating-visible="true"' /tmp/tilda.dom && echo 'PASS parent view switch follows parent scroll'
+          grep -q 'data-pw-active-view="details"' /tmp/tilda.dom && echo 'PASS active view synced after navigation'
+          grep -q 'model-v2-lab/index.html?lang=ru&amp;embed=1' /tmp/tilda.dom && echo 'PASS parent view switch opened Details'
 
-          echo "PASS: RC loader preserves host shell and receives cross-origin product resize"
+          echo "PASS: RC loader preserves host shell, auto-resize and parent-level Overview/Details navigation"
