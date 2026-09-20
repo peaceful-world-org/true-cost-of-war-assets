@@ -9,7 +9,7 @@
   const iframe=document.createElement('iframe');
   iframe.id='pw-tcow-current-product-rc';
   iframe.dataset.pwTcowRc=lang;
-  iframe.dataset.pwSourceCommit='690bc54dd53969a9cbd339064e8c52385cf4ea68';
+  iframe.dataset.pwSourceCommit='70b0c0ad869460a88f954fa42c8d5b02ff501b1f';
   iframe.title=lang==='ru'?'Истинная цена войны — релиз-кандидат':'The True Cost of War — release candidate';
   iframe.loading='eager';
   iframe.scrolling='no';
