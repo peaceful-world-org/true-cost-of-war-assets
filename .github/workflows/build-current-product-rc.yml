@@ -21,7 +21,7 @@ jobs:
 
     env:
       SOURCE_COMMIT: 8b4f8e207cdef84a3958953fb37954a7c3816283
-      RC_RELEASE: rc-2026-09-20-current-product-d
+      RC_RELEASE: rc-2026-09-20-current-product-e
       PRODUCT_ORIGIN: https://peaceful-world-org.github.io
       PRODUCT_BASE: https://peaceful-world-org.github.io/true-cost-of-war
 
@@ -103,9 +103,106 @@ jobs:
                 #pw-tcow-parent-view-switch.is-visible{transform:translate(-50%,0) scale(1)}
                 #pw-tcow-parent-view-switch button{min-width:82px;font-size:11px}
               }
-              @media(prefers-reduced-motion:reduce){#pw-tcow-parent-view-switch{transition:none}}
+              #pw-tcow-parent-session-counter{
+                position:fixed;top:96px;right:22px;z-index:999998;
+                display:flex;min-width:184px;flex-direction:column;gap:3px;
+                padding:10px 13px;border:1px solid rgba(201,196,184,.86);border-radius:15px;
+                background:rgba(255,254,251,.95);box-shadow:0 7px 22px rgba(24,26,23,.09);
+                backdrop-filter:blur(12px);color:#181a17;
+                opacity:0;pointer-events:none;transform:translateY(-8px) scale(.98);
+                transition:opacity .16s ease,transform .16s ease;
+              }
+              #pw-tcow-parent-session-counter.is-visible{
+                opacity:1;transform:translateY(0) scale(1);
+              }
+              #pw-tcow-parent-session-counter .pw-live-label{
+                display:flex;align-items:center;gap:6px;color:#5f625b;
+                font:800 9.5px/1.2 Inter,system-ui,sans-serif;letter-spacing:.055em;text-transform:uppercase;
+                white-space:nowrap;
+              }
+              #pw-tcow-parent-session-counter .pw-live-dot{
+                width:7px;height:7px;flex:0 0 7px;border-radius:50%;background:#b5483d;
+                box-shadow:0 0 0 3px rgba(181,72,61,.10);
+              }
+              #pw-tcow-parent-session-counter .pw-live-value{
+                color:#181a17;font:850 20px/1.15 Inter,system-ui,sans-serif;
+                font-variant-numeric:tabular-nums;letter-spacing:-.02em;white-space:nowrap;
+              }
+              @media(max-width:980px){
+                #pw-tcow-parent-session-counter{
+                  top:auto;right:auto;left:50%;
+                  bottom:calc(62px + env(safe-area-inset-bottom,0px));
+                  min-width:0;max-width:calc(100vw - 24px);padding:8px 12px;border-radius:13px;
+                  transform:translate(-50%,8px) scale(.98);
+                }
+                #pw-tcow-parent-session-counter.is-visible{transform:translate(-50%,0) scale(1)}
+                #pw-tcow-parent-session-counter .pw-live-label{font-size:9px}
+                #pw-tcow-parent-session-counter .pw-live-value{font-size:18px}
+              }
+              @media(prefers-reduced-motion:reduce){
+                #pw-tcow-parent-view-switch,#pw-tcow-parent-session-counter{transition:none}
+              }
             `;
             document.head.appendChild(chromeStyle);
+
+            const sessionCounter=document.createElement('aside');
+            sessionCounter.id='pw-tcow-parent-session-counter';
+            sessionCounter.dataset.pwSessionCounter='true';
+            sessionCounter.setAttribute('aria-label',lang==='ru'?'Расходы за время просмотра':'Spending while you view');
+            sessionCounter.innerHTML=`
+              <div class="pw-live-label"><span class="pw-live-dot" aria-hidden="true"></span><span>${lang==='ru'?'ПОКА ВЫ СМОТРИТЕ':'WHILE YOU VIEW'}</span></div>
+              <div class="pw-live-value" data-live-value>$ 0</div>
+            `;
+
+            const annualSpend=2887000000000;
+            const secondsPerYear=365.25*24*60*60;
+            const spendPerSecond=annualSpend/secondsPerYear;
+            let activeAccumulatedMs=0;
+            let activeSince=document.hidden?null:performance.now();
+
+            function activeElapsedMs(now=performance.now()){
+              if(activeSince===null) return activeAccumulatedMs;
+              return activeAccumulatedMs+Math.max(0,now-activeSince);
+            }
+
+            function setViewingActive(active,now=performance.now()){
+              if(active){
+                if(activeSince===null) activeSince=now;
+              }else if(activeSince!==null){
+                activeAccumulatedMs+=Math.max(0,now-activeSince);
+                activeSince=null;
+              }
+            }
+
+            document.addEventListener('visibilitychange',()=>{
+              setViewingActive(!document.hidden);
+              updateSessionCounter();
+            });
+
+            function formatSessionSpend(value){
+              const abs=Math.max(0,Number(value)||0);
+              const locale=lang==='ru'?'ru-RU':'en-US';
+              const specs=lang==='ru'
+                ? [[1e12,'трлн'],[1e9,'млрд'],[1e6,'млн'],[1e3,'тыс.']]
+                : [[1e12,'tn'],[1e9,'bn'],[1e6,'m'],[1e3,'k']];
+              for(const [scale,suffix] of specs){
+                if(abs>=scale){
+                  const scaled=abs/scale;
+                  const digits=scaled<10?2:scaled<100?1:0;
+                  return '$ '+new Intl.NumberFormat(locale,{minimumFractionDigits:digits,maximumFractionDigits:digits}).format(scaled)+' '+suffix;
+                }
+              }
+              return '$ '+new Intl.NumberFormat(locale,{maximumFractionDigits:0}).format(abs);
+            }
+
+            function updateSessionCounter(){
+              const value=spendPerSecond*(activeElapsedMs()/1000);
+              sessionCounter.querySelector('[data-live-value]').textContent=formatSessionSpend(value);
+              sessionCounter.dataset.pwLiveValue=String(Math.floor(value));
+            }
+
+            setInterval(updateSessionCounter,250);
+            updateSessionCounter();
 
             const viewSwitch=document.createElement('nav');
             viewSwitch.id='pw-tcow-parent-view-switch';
@@ -138,11 +235,17 @@ jobs:
 
             function syncFloatingVisibility(){
               const rect=iframe.getBoundingClientRect();
-              const passedTop=rect.top < -110;
+              const activeView=viewSwitch.dataset.pwActiveView||'overview';
               const overlapsViewport=rect.bottom > 120 && rect.top < (window.innerHeight-80);
-              const visible=passedTop && overlapsViewport;
-              viewSwitch.classList.toggle('is-visible',visible);
-              viewSwitch.dataset.pwFloatingVisible=String(visible);
+
+              const viewSwitchVisible=rect.top < -110 && overlapsViewport;
+              viewSwitch.classList.toggle('is-visible',viewSwitchVisible);
+              viewSwitch.dataset.pwFloatingVisible=String(viewSwitchVisible);
+
+              const counterThreshold=activeView==='details'?-240:-820;
+              const counterVisible=rect.top < counterThreshold && overlapsViewport;
+              sessionCounter.classList.toggle('is-visible',counterVisible);
+              sessionCounter.dataset.pwLiveVisible=String(counterVisible);
             }
 
             window.addEventListener('scroll',syncFloatingVisibility,{passive:true});
@@ -195,6 +298,7 @@ jobs:
             if(anchor?.parentNode) anchor.parentNode.insertBefore(iframe,anchor);
             else document.body.appendChild(iframe);
             document.body.appendChild(viewSwitch);
+            document.body.appendChild(sessionCounter);
 
             syncFloatingVisibility();
             setTimeout(requestState,1200);
@@ -223,7 +327,9 @@ jobs:
               f"productBase={product_base}\n"
               "status=release-candidate-not-production\n"
               "languages=en,ru\n"
-              "productionManifestChanged=no\n",
+              "productionManifestChanged=no\n"
+              "parentFloatingSessionCounter=yes\n"
+              "sessionCounterRate=2887000000000/365.25days\n",
               encoding="utf-8",
           )
           PY
@@ -329,5 +435,8 @@ jobs:
           grep -q 'data-pw-floating-visible="true"' /tmp/tilda.dom && echo 'PASS parent view switch follows parent scroll'
           grep -q 'data-pw-active-view="details"' /tmp/tilda.dom && echo 'PASS active view synced after navigation'
           grep -q 'model-v2-lab/index.html?lang=ru&amp;embed=1' /tmp/tilda.dom && echo 'PASS parent view switch opened Details'
+          grep -q 'id="pw-tcow-parent-session-counter"' /tmp/tilda.dom && echo 'PASS parent session counter inserted'
+          grep -q 'data-pw-live-visible="true"' /tmp/tilda.dom && echo 'PASS session counter follows parent scroll'
+          grep -Eq 'data-pw-live-value="[1-9][0-9]*"' /tmp/tilda.dom && echo 'PASS session counter advances'
 
-          echo "PASS: RC loader preserves host shell, auto-resize and parent-level Overview/Details navigation"
+          echo "PASS: RC loader preserves host shell, auto-resize, parent navigation and continuous floating session counter"
