@@ -21,7 +21,7 @@ jobs:
 
     env:
       SOURCE_COMMIT: c711ef8b36d0d121efd45f73c7591306917ec34f
-      RC_RELEASE: rc-2026-09-20-current-product-a
+      RC_RELEASE: rc-2026-09-20-current-product-b
       PRODUCT_ORIGIN: https://peaceful-world-org.github.io
       PRODUCT_BASE: https://peaceful-world-org.github.io/true-cost-of-war
 
@@ -56,7 +56,6 @@ jobs:
             iframe.id='pw-tcow-current-product-rc';
             iframe.dataset.pwTcowRc=lang;
             iframe.dataset.pwSourceCommit=__COMMIT__;
-            iframe.src=__SRC__;
             iframe.title=lang==='ru'?'Истинная цена войны — релиз-кандидат':'The True Cost of War — release candidate';
             iframe.loading='eager';
             iframe.scrolling='no';
@@ -70,10 +69,6 @@ jobs:
               display:'block'
             });
 
-            const anchor=current||document.body.lastChild;
-            if(anchor?.parentNode) anchor.parentNode.insertBefore(iframe,anchor);
-            else document.body.appendChild(iframe);
-
             function onMessage(event){
               if(event.origin!==__ORIGIN__) return;
               if(event.source!==iframe.contentWindow) return;
@@ -82,14 +77,31 @@ jobs:
               if(!Number.isFinite(height)||height<100) return;
               iframe.style.height=Math.ceil(height)+'px';
               iframe.dataset.pwResize=String(Math.ceil(height));
+              iframe.dataset.pwResizeStatus='received';
             }
             window.addEventListener('message',onMessage);
 
-            iframe.addEventListener('load',()=>{
+            function requestResize(){
               try{
                 iframe.contentWindow?.postMessage({type:'pw2-request-resize'},__ORIGIN__);
               }catch(_){}
+            }
+
+            iframe.addEventListener('load',()=>{
+              iframe.dataset.pwLoad='true';
+              requestResize();
+              setTimeout(requestResize,150);
+              setTimeout(requestResize,600);
             });
+
+            iframe.src=__SRC__;
+
+            const anchor=current||document.body.lastChild;
+            if(anchor?.parentNode) anchor.parentNode.insertBefore(iframe,anchor);
+            else document.body.appendChild(iframe);
+
+            setTimeout(requestResize,1200);
+            setTimeout(requestResize,3000);
           })();
           """
 
@@ -201,6 +213,8 @@ jobs:
           grep -q 'tilda-shell-sentinel' /tmp/tilda.dom
           grep -q 'pw-tcow-current-product-rc' /tmp/tilda.dom
           grep -q 'data-pw-tcow-rc="ru"' /tmp/tilda.dom
+          grep -q 'data-pw-load="true"' /tmp/tilda.dom
+          grep -q 'data-pw-resize-status="received"' /tmp/tilda.dom
           grep -q 'data-pw-resize=' /tmp/tilda.dom
 
           echo "PASS: RC loader preserves host shell and receives cross-origin product resize"
