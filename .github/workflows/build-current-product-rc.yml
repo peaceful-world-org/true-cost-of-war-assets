@@ -21,7 +21,7 @@ jobs:
 
     env:
       SOURCE_COMMIT: c711ef8b36d0d121efd45f73c7591306917ec34f
-      RC_RELEASE: rc-2026-09-20-current-product-b
+      RC_RELEASE: rc-2026-09-20-current-product-c
       PRODUCT_ORIGIN: https://peaceful-world-org.github.io
       PRODUCT_BASE: https://peaceful-world-org.github.io/true-cost-of-war
 
@@ -71,10 +71,19 @@ jobs:
 
             function onMessage(event){
               if(event.origin!==__ORIGIN__) return;
-              if(event.source!==iframe.contentWindow) return;
+              iframe.dataset.pwMessageOrigin='matched';
+              iframe.dataset.pwMessageType=String(event.data?.type||'unknown');
+              if(event.source!==iframe.contentWindow){
+                iframe.dataset.pwMessageSource='mismatch';
+                return;
+              }
+              iframe.dataset.pwMessageSource='matched';
               if(event.data?.type!=='pw2-resize') return;
               const height=Number(event.data.height);
-              if(!Number.isFinite(height)||height<100) return;
+              if(!Number.isFinite(height)||height<100){
+                iframe.dataset.pwResizeStatus='invalid-height';
+                return;
+              }
               iframe.style.height=Math.ceil(height)+'px';
               iframe.dataset.pwResize=String(Math.ceil(height));
               iframe.dataset.pwResizeStatus='received';
@@ -210,11 +219,16 @@ jobs:
             --virtual-time-budget=12000 --dump-dom \
             http://127.0.0.1:8765/tilda-host.html > /tmp/tilda.dom
 
-          grep -q 'tilda-shell-sentinel' /tmp/tilda.dom
-          grep -q 'pw-tcow-current-product-rc' /tmp/tilda.dom
-          grep -q 'data-pw-tcow-rc="ru"' /tmp/tilda.dom
-          grep -q 'data-pw-load="true"' /tmp/tilda.dom
-          grep -q 'data-pw-resize-status="received"' /tmp/tilda.dom
-          grep -q 'data-pw-resize=' /tmp/tilda.dom
+          echo "---- rendered iframe ----"
+          grep -o '<iframe[^>]*id="pw-tcow-current-product-rc"[^>]*>' /tmp/tilda.dom || true
+          echo "---- assertions ----"
+          grep -q 'tilda-shell-sentinel' /tmp/tilda.dom && echo 'PASS host sentinel'
+          grep -q 'pw-tcow-current-product-rc' /tmp/tilda.dom && echo 'PASS iframe inserted'
+          grep -q 'data-pw-tcow-rc="ru"' /tmp/tilda.dom && echo 'PASS language marker'
+          grep -q 'data-pw-load="true"' /tmp/tilda.dom && echo 'PASS iframe load event'
+          grep -q 'data-pw-message-origin="matched"' /tmp/tilda.dom && echo 'PASS child message origin'
+          grep -q 'data-pw-message-source="matched"' /tmp/tilda.dom && echo 'PASS child message source'
+          grep -q 'data-pw-resize-status="received"' /tmp/tilda.dom && echo 'PASS resize message'
+          grep -q 'data-pw-resize=' /tmp/tilda.dom && echo 'PASS resize height'
 
           echo "PASS: RC loader preserves host shell and receives cross-origin product resize"
