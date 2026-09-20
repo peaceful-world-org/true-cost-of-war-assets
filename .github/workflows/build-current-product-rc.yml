@@ -15,13 +15,15 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  build-publish-test:
+  publish-test-loader:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 10
 
     env:
       SOURCE_COMMIT: c711ef8b36d0d121efd45f73c7591306917ec34f
       RC_RELEASE: rc-2026-09-20-current-product-a
+      PRODUCT_ORIGIN: https://peaceful-world-org.github.io
+      PRODUCT_BASE: https://peaceful-world-org.github.io/true-cost-of-war
 
     steps:
       - name: Check out public assets repository
@@ -29,44 +31,21 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Check out reviewed source commit
-        uses: actions/checkout@v4
-        with:
-          repository: peaceful-world-org/true-cost-of-war
-          ref: ${{ env.SOURCE_COMMIT }}
-          path: source
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
-
-      - name: Build and browser-test reviewed widget bundle
-        shell: bash
-        run: |
-          set -euo pipefail
-          cd source
-          python scripts/build_widget_bundle.py
-          python scripts/browser_smoke_widget_bundle.py
-
-      - name: Assemble immutable RC delivery package
+      - name: Build isolated EN/RU RC loaders
         shell: bash
         run: |
           set -euo pipefail
           out="releases/${RC_RELEASE}"
           rm -rf "$out"
-          mkdir -p "$out/widget"
-          cp -R source/dist/true-cost-of-war/. "$out/widget/"
+          mkdir -p "$out"
 
           python - <<'PY'
           from pathlib import Path
           import os
 
           release = os.environ["RC_RELEASE"]
-          base = (
-              "https://cdn.jsdelivr.net/gh/peaceful-world-org/"
-              f"true-cost-of-war-assets@{release}/releases/{release}"
-          )
+          origin = os.environ["PRODUCT_ORIGIN"]
+          product_base = os.environ["PRODUCT_BASE"]
 
           template = r"""(()=>{
             const current=document.currentScript;
@@ -76,11 +55,11 @@ jobs:
             const iframe=document.createElement('iframe');
             iframe.id='pw-tcow-current-product-rc';
             iframe.dataset.pwTcowRc=lang;
+            iframe.dataset.pwSourceCommit=__COMMIT__;
             iframe.src=__SRC__;
             iframe.title=lang==='ru'?'Истинная цена войны — релиз-кандидат':'The True Cost of War — release candidate';
             iframe.loading='eager';
             iframe.scrolling='no';
-            iframe.setAttribute('allow','clipboard-write');
             Object.assign(iframe.style,{
               width:'100%',
               border:'0',
@@ -96,7 +75,7 @@ jobs:
             else document.body.appendChild(iframe);
 
             function onMessage(event){
-              if(event.origin!=='https://cdn.jsdelivr.net') return;
+              if(event.origin!==__ORIGIN__) return;
               if(event.source!==iframe.contentWindow) return;
               if(event.data?.type!=='pw2-resize') return;
               const height=Number(event.data.height);
@@ -108,29 +87,37 @@ jobs:
 
             iframe.addEventListener('load',()=>{
               try{
-                iframe.contentWindow?.postMessage({type:'pw2-request-resize'},'https://cdn.jsdelivr.net');
+                iframe.contentWindow?.postMessage({type:'pw2-request-resize'},__ORIGIN__);
               }catch(_){}
             });
           })();
           """
 
-          for lang, route in (("en", "index.html"), ("ru", "ru/index.html")):
-              src = f"{base}/widget/{route}?embed=1"
-              code = template.replace("__SRC__", repr(src))
+          commit = repr(os.environ["SOURCE_COMMIT"])
+          origin_js = repr(origin)
+          for lang in ("en", "ru"):
+              src = f"{product_base}/unified/product.html?lang={lang}&embed=1"
+              code = (
+                  template
+                  .replace("__SRC__", repr(src))
+                  .replace("__ORIGIN__", origin_js)
+                  .replace("__COMMIT__", commit)
+              )
               Path(f"releases/{release}/{lang}-loader.js").write_text(code + "\n", encoding="utf-8")
 
           Path(f"releases/{release}/CANDIDATE.txt").write_text(
-              f"release={release}\nsourceCommit={os.environ['SOURCE_COMMIT']}\n"
+              f"release={release}\n"
+              f"sourceCommit={os.environ['SOURCE_COMMIT']}\n"
+              f"productBase={product_base}\n"
               "status=release-candidate-not-production\n"
-              "languages=en,ru\n",
+              "languages=en,ru\n"
+              "productionManifestChanged=no\n",
               encoding="utf-8",
           )
           PY
 
           test -s "$out/en-loader.js"
           test -s "$out/ru-loader.js"
-          test -s "$out/widget/unified/product.html"
-          test -s "$out/widget/model-v2-lab/index.html"
 
       - name: Commit and tag RC without changing production manifest
         shell: bash
@@ -139,22 +126,22 @@ jobs:
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add "releases/${RC_RELEASE}"
-          git commit -m "Publish current-product release candidate ${RC_RELEASE}"
+          git commit -m "Publish current-product integration RC ${RC_RELEASE}"
           git tag -f "${RC_RELEASE}"
           git push origin HEAD:rc/current-product-2026-09-20
           git push origin "refs/tags/${RC_RELEASE}" --force
 
-      - name: Wait for immutable jsDelivr RC
+      - name: Wait for immutable jsDelivr RC loaders
         shell: bash
         run: |
           set -euo pipefail
           base="https://cdn.jsdelivr.net/gh/peaceful-world-org/true-cost-of-war-assets@${RC_RELEASE}/releases/${RC_RELEASE}"
-          for path in ru-loader.js en-loader.js widget/ru/index.html widget/unified/product.html widget/model-v2-lab/index.html; do
+          for path in ru-loader.js en-loader.js; do
             echo "Checking $path"
             ok=0
             for attempt in {1..15}; do
               if curl --fail --location --silent --show-error --max-time 20 "$base/$path" -o /tmp/asset; then
-                test "$(wc -c < /tmp/asset)" -gt 100
+                test "$(wc -c < /tmp/asset)" -gt 500
                 ok=1
                 break
               fi
@@ -163,18 +150,17 @@ jobs:
             test "$ok" -eq 1
           done
 
-      - name: Real-browser smoke immutable CDN product
+      - name: Verify reviewed GitHub Pages product is live
         shell: bash
         run: |
           set -euo pipefail
           browser="$(command -v google-chrome || command -v google-chrome-stable || command -v chromium || command -v chromium-browser)"
           test -n "$browser"
-          base="https://cdn.jsdelivr.net/gh/peaceful-world-org/true-cost-of-war-assets@${RC_RELEASE}/releases/${RC_RELEASE}"
 
           "$browser" --headless=new --no-sandbox --disable-gpu --disable-dev-shm-usage \
             --disable-background-networking --hide-scrollbars --window-size=390,1000 \
             --virtual-time-budget=9000 --dump-dom \
-            "$base/widget/ru/index.html?embed=1" > /tmp/ru.dom
+            "${PRODUCT_BASE}/unified/product.html?lang=ru&embed=1" > /tmp/ru.dom
           grep -q 'pw-product-overview' /tmp/ru.dom
           grep -q 'Экономические потери' /tmp/ru.dom
           grep -q 'data-product-floating-switch' /tmp/ru.dom
@@ -182,7 +168,7 @@ jobs:
           "$browser" --headless=new --no-sandbox --disable-gpu --disable-dev-shm-usage \
             --disable-background-networking --hide-scrollbars --window-size=1280,1000 \
             --virtual-time-budget=9000 --dump-dom \
-            "$base/widget/index.html?embed=1" > /tmp/en.dom
+            "${PRODUCT_BASE}/unified/product.html?lang=en&embed=1" > /tmp/en.dom
           grep -q 'pw-product-overview' /tmp/en.dom
           grep -q 'Economic losses' /tmp/en.dom
           grep -q 'data-product-floating-switch' /tmp/en.dom
@@ -217,4 +203,4 @@ jobs:
           grep -q 'data-pw-tcow-rc="ru"' /tmp/tilda.dom
           grep -q 'data-pw-resize=' /tmp/tilda.dom
 
-          echo "PASS: immutable RC loader renders current RU product and receives cross-origin resize"
+          echo "PASS: RC loader preserves host shell and receives cross-origin product resize"
