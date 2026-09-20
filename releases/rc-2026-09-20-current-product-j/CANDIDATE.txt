@@ -1,5 +1,5 @@
 release=rc-2026-09-20-current-product-j
-sourceCommit=b544a5d8e75cd28a09f7e2eb669ff29fba12e61e
+sourceCommit=07adf1fd1b0ad5829a98b06e946fa188879d786a
 productBase=https://peaceful-world-org.github.io/true-cost-of-war
 status=release-candidate-not-production
 languages=en,ru
