@@ -21,7 +21,7 @@ jobs:
 
     env:
       SOURCE_COMMIT: 8b4f8e207cdef84a3958953fb37954a7c3816283
-      RC_RELEASE: rc-2026-09-20-current-product-f
+      RC_RELEASE: rc-2026-09-20-current-product-g
       PRODUCT_ORIGIN: https://peaceful-world-org.github.io
       PRODUCT_BASE: https://peaceful-world-org.github.io/true-cost-of-war
 
@@ -107,7 +107,7 @@ jobs:
                 position:fixed;top:96px;right:22px;z-index:999998;
                 display:flex;min-width:214px;max-width:232px;flex-direction:column;gap:4px;
                 padding:11px 14px 10px;border:1px solid rgba(201,196,184,.86);border-radius:15px;
-                background:rgba(255,254,251,.95);box-shadow:0 7px 22px rgba(24,26,23,.09);
+                background:rgba(255,254,251,.95);box-shadow:0 5px 16px rgba(24,26,23,.065);
                 backdrop-filter:blur(12px);color:#181a17;
                 opacity:0;pointer-events:none;transform:translateY(-8px) scale(.98);
                 transition:opacity .16s ease,transform .16s ease;
@@ -129,7 +129,7 @@ jobs:
                 font-variant-numeric:tabular-nums;letter-spacing:-.025em;white-space:nowrap;
               }
               #pw-tcow-parent-session-counter .pw-live-note{
-                margin-top:1px;color:#74766f;font:560 9.2px/1.28 Inter,system-ui,sans-serif;
+                margin-top:1px;color:#696b65;font:570 9.8px/1.3 Inter,system-ui,sans-serif;
                 letter-spacing:.005em;white-space:normal;
               }
               @media(max-width:980px){
@@ -142,7 +142,7 @@ jobs:
                 #pw-tcow-parent-session-counter.is-visible{transform:translate(-50%,0) scale(1)}
                 #pw-tcow-parent-session-counter .pw-live-label{font-size:8.8px}
                 #pw-tcow-parent-session-counter .pw-live-value{font-size:18px}
-                #pw-tcow-parent-session-counter .pw-live-note{font-size:8.8px}
+                #pw-tcow-parent-session-counter .pw-live-note{font-size:9.2px}
               }
               @media(prefers-reduced-motion:reduce){
                 #pw-tcow-parent-view-switch,#pw-tcow-parent-session-counter{transition:none}
@@ -159,8 +159,8 @@ jobs:
               : 'Calculation: $2.887 trillion ÷ 365.25 ÷ 24 ÷ 60 ÷ 60 × active viewing time.';
             sessionCounter.innerHTML=`
               <div class="pw-live-label"><span class="pw-live-dot" aria-hidden="true"></span><span>${lang==='ru'?'ЗА ВРЕМЯ ПРОСМОТРА':'DURING YOUR VIEW'}</span></div>
-              <div class="pw-live-value" data-live-value>$ 0</div>
-              <div class="pw-live-note">${lang==='ru'?'мировые военные расходы · темп 2025':'world military spending · 2025 rate'}</div>
+              <div class="pw-live-value" data-live-value>≈ $ 0</div>
+              <div class="pw-live-note">${lang==='ru'?'мировые военные расходы · средний темп 2025':'world military spending · 2025 average rate'}</div>
             `;
 
             const annualSpend=2887000000000;
@@ -206,7 +206,7 @@ jobs:
 
             function updateSessionCounter(){
               const value=spendPerSecond*(activeElapsedMs()/1000);
-              sessionCounter.querySelector('[data-live-value]').textContent=formatSessionSpend(value);
+              sessionCounter.querySelector('[data-live-value]').textContent='≈ '+formatSessionSpend(value);
               sessionCounter.dataset.pwLiveValue=String(Math.floor(value));
             }
 
@@ -446,7 +446,13 @@ jobs:
           grep -q 'model-v2-lab/index.html?lang=ru&amp;embed=1' /tmp/tilda.dom && echo 'PASS parent view switch opened Details'
           grep -q 'id="pw-tcow-parent-session-counter"' /tmp/tilda.dom && echo 'PASS parent session counter inserted'
           grep -q 'ЗА ВРЕМЯ ПРОСМОТРА' /tmp/tilda.dom && echo 'PASS session counter explanatory label'
-          grep -q 'мировые военные расходы · темп 2025' /tmp/tilda.dom && echo 'PASS session counter methodology note'
+          grep -q 'мировые военные расходы · средний темп 2025' /tmp/tilda.dom && echo 'PASS session counter methodology note'
+          grep -q '≈ \
+          grep -q 'data-pw-live-visible="true"' /tmp/tilda.dom && echo 'PASS session counter follows parent scroll'
+          grep -Eq 'data-pw-live-value="[1-9][0-9]*"' /tmp/tilda.dom && echo 'PASS session counter advances'
+
+          echo "PASS: RC loader preserves host shell, auto-resize, parent navigation and continuous floating session counter"
+ /tmp/tilda.dom && echo 'PASS approximate-value marker'
           grep -q 'data-pw-live-visible="true"' /tmp/tilda.dom && echo 'PASS session counter follows parent scroll'
           grep -Eq 'data-pw-live-value="[1-9][0-9]*"' /tmp/tilda.dom && echo 'PASS session counter advances'
 
