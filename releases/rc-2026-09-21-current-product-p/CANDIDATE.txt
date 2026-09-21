@@ -1,0 +1,16 @@
+release=rc-2026-09-21-current-product-p
+sourceCommit=2c58e1e74ec295efca96be79811a3dc3577d57a3
+productBase=https://peaceful-world-org.github.io/true-cost-of-war
+status=final-qa-candidate
+languages=en,ru
+productionManifestChanged=no
+parentFloatingSessionCounter=yes
+sessionCounterRate=2887000000000/365.25days
+sessionCounterLayout=below-sticky-header-center-mobile
+mobileViewSwitch=viewport-bottom-center
+mobileTopChrome=hidden-in-iframe
+mobileSessionCard=hidden-in-iframe
+mobileTopDock=reserved-50px
+mobileHeroTextColumn=16px
+copyFreeze=yes
+performanceIssue=151
