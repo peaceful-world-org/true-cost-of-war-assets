@@ -12,6 +12,7 @@
   let latestText='';
   let latestSpend=0;
   let latestElapsedMs=0;
+  let latestSessionCardBottom=NaN;
   let lastStateAt=-Infinity;
 
   function resolveNodes(){
@@ -56,16 +57,41 @@
     },PRODUCT_ORIGIN);
   }
 
+  function syncFloatingVisibility(){
+    resolveNodes();
+    if(!counter||!iframe) return;
+
+    const viewSwitch=document.querySelector('#pw-tcow-parent-view-switch');
+    const activeView=viewSwitch?.dataset?.pwActiveView||'overview';
+
+    // Details has no inline while-viewing card, so retain the loader's existing
+    // Details threshold. Overview uses a true handoff: the floating counter
+    // appears only after the inline counter has passed behind the sticky header.
+    if(activeView!=='overview'||!Number.isFinite(latestSessionCardBottom)) return;
+
+    const iframeRect=iframe.getBoundingClientRect();
+    const overlapsViewport=iframeRect.bottom>120&&iframeRect.top<(window.innerHeight-80);
+    const handoffBoundary=window.innerWidth<=980?96:104;
+    const inlineBottomInParent=iframeRect.top+latestSessionCardBottom;
+    const visible=overlapsViewport&&inlineBottomInParent<=handoffBoundary;
+
+    counter.classList.toggle('is-visible',visible);
+    counter.dataset.pwLiveVisible=String(visible);
+    counter.dataset.pwVisibilityOwner='session-sync';
+  }
+
   function applyChildState(data){
     resolveNodes();
     const spend=Number(data?.spend);
     const elapsedMs=Number(data?.elapsedMs);
+    const sessionCardBottom=Number(data?.sessionCardBottom);
     const text=typeof data?.spendText==='string'?data.spendText:'';
     if(!valueNode || !text || !Number.isFinite(spend) || !Number.isFinite(elapsedMs)) return;
 
     latestText=text;
     latestSpend=Math.max(0,spend);
     latestElapsedMs=Math.max(0,elapsedMs);
+    if(Number.isFinite(sessionCardBottom)) latestSessionCardBottom=sessionCardBottom;
     lastStateAt=performance.now();
 
     if(valueNode.textContent!==latestText) valueNode.textContent=latestText;
@@ -74,6 +100,7 @@
       counter.dataset.pwLiveElapsedMs=String(Math.round(latestElapsedMs));
       counter.dataset.pwSessionSync='child';
     }
+    syncFloatingVisibility();
   }
 
   function onMessage(event){
@@ -92,13 +119,17 @@
   }
 
   window.addEventListener('message',onMessage);
+  window.addEventListener('scroll',syncFloatingVisibility,{passive:true});
+  window.addEventListener('resize',syncFloatingVisibility,{passive:true});
 
   const domObserver=new MutationObserver(()=>{
     resolveNodes();
+    syncFloatingVisibility();
   });
   domObserver.observe(document.documentElement,{childList:true,subtree:true});
 
   resolveNodes();
+  syncFloatingVisibility();
   setTimeout(sendSeed,250);
   setTimeout(sendSeed,900);
   setTimeout(sendSeed,2200);
