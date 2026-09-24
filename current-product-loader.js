@@ -101,7 +101,7 @@
     }
     @media(max-width:980px){
       #pw-tcow-parent-session-counter{
-        top:4px;right:auto;left:50%;bottom:auto;
+        position:fixed!important;top:4px;right:auto;left:50%;bottom:auto!important;
         min-width:0;max-width:176px;padding:6px 10px;border-radius:11px;gap:1px;
         transform:translate(-50%,-6px) scale(.98);
       }
@@ -141,6 +141,7 @@
   let activeAccumulatedMs=0;
   let activeSince=document.hidden?null:performance.now();
   let latestSessionCardBottom=NaN;
+  let awaitingOverviewGeometry=false;
 
   function activeElapsedMs(now=performance.now()){
     if(activeSince===null) return activeAccumulatedMs;
@@ -206,6 +207,10 @@
   viewSwitch.dataset.pwViewSwitch='true';
   viewSwitch.setAttribute('aria-label',lang==='ru'?'Режим просмотра':'View mode');
 
+  function overviewUrl(){
+    return overviewSrc+'&sessionMs='+Math.round(activeElapsedMs());
+  }
+
   function makeViewButton(view,label){
     const button=document.createElement('button');
     button.type='button';
@@ -213,7 +218,7 @@
     button.textContent=label;
     button.addEventListener('click',()=>{
       setActiveView(view);
-      iframe.src=view==='details'?detailsSrc:overviewSrc;
+      iframe.src=view==='details'?detailsSrc:overviewUrl();
     });
     viewSwitch.appendChild(button);
     return button;
@@ -224,10 +229,16 @@
 
   function setActiveView(view){
     const normalized=view==='details'?'details':'overview';
+    const previous=viewSwitch.dataset.pwActiveView||'overview';
     viewSwitch.dataset.pwActiveView=normalized;
     overviewButton.setAttribute('aria-pressed',String(normalized==='overview'));
     detailsButton.setAttribute('aria-pressed',String(normalized==='details'));
-    if(normalized==='overview') latestSessionCardBottom=NaN;
+    if(normalized==='overview'){
+      awaitingOverviewGeometry=previous==='details';
+      latestSessionCardBottom=NaN;
+    }else{
+      awaitingOverviewGeometry=false;
+    }
     syncFloatingVisibility();
   }
   setActiveView('overview');
@@ -260,8 +271,13 @@
     const overlapsViewport=rect.bottom>120&&rect.top<(window.innerHeight-80);
     const mobile=window.matchMedia('(max-width:980px)').matches;
 
-    if(mobile) sessionCounter.style.top=Math.round(mobileHeaderBottom()+4)+'px';
-    else sessionCounter.style.top='';
+    if(mobile){
+      sessionCounter.style.top=Math.round(mobileHeaderBottom()+4)+'px';
+      sessionCounter.style.bottom='auto';
+    }else{
+      sessionCounter.style.top='';
+      sessionCounter.style.bottom='';
+    }
 
     const mobileSwitchThreshold=activeView==='details'?-240:-420;
     const viewSwitchVisible=(mobile?rect.top<mobileSwitchThreshold:rect.top<-110)&&overlapsViewport;
@@ -271,6 +287,8 @@
     let counterVisible=false;
     if(activeView==='details'){
       counterVisible=rect.top<-240&&overlapsViewport;
+    }else if(awaitingOverviewGeometry){
+      counterVisible=sessionCounter.classList.contains('is-visible')&&overlapsViewport;
     }else if(Number.isFinite(latestSessionCardBottom)){
       const handoffBoundary=mobile?mobileHeaderBottom()+8:104;
       const inlineBottomInParent=rect.top+latestSessionCardBottom;
@@ -300,7 +318,10 @@
 
     if(event.data?.type==='pw2-session-state'){
       const bottom=Number(event.data.sessionCardBottom);
-      if(Number.isFinite(bottom)) latestSessionCardBottom=bottom;
+      if(Number.isFinite(bottom)){
+        latestSessionCardBottom=bottom;
+        awaitingOverviewGeometry=false;
+      }
       syncFloatingVisibility();
       return;
     }
@@ -341,7 +362,7 @@
     setTimeout(syncFloatingVisibility,0);
   });
 
-  iframe.src=overviewSrc;
+  iframe.src=overviewUrl();
 
   const anchor=current||document.body.lastChild;
   if(anchor?.parentNode) anchor.parentNode.insertBefore(iframe,anchor);
