@@ -137,6 +137,7 @@
   const annualSpend=2887000000000;
   const secondsPerYear=365.25*24*60*60;
   const spendPerSecond=annualSpend/secondsPerYear;
+  const SESSION_TICK_MS=80;
 
   let activeAccumulatedMs=0;
   let activeSince=document.hidden?null:performance.now();
@@ -166,7 +167,7 @@
     for(const [scale,suffix] of specs){
       if(abs>=scale){
         const scaled=abs/scale;
-        const digits=scaled<10?2:scaled<100?1:0;
+        const digits=scaled<100?2:scaled<1000?1:0;
         return '$ '+new Intl.NumberFormat(locale,{
           minimumFractionDigits:digits,
           maximumFractionDigits:digits
@@ -199,7 +200,7 @@
     updateSessionCounter();
   });
 
-  const sessionInterval=setInterval(updateSessionCounter,250);
+  const sessionInterval=setInterval(updateSessionCounter,SESSION_TICK_MS);
   updateSessionCounter();
 
   const viewSwitch=document.createElement('nav');
