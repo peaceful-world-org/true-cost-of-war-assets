@@ -137,7 +137,7 @@
   const annualSpend=2887000000000;
   const secondsPerYear=365.25*24*60*60;
   const spendPerSecond=annualSpend/secondsPerYear;
-  const SESSION_TICK_FAST_MS=16;
+  const SESSION_TICK_FAST_MS=50;
   const SESSION_TICK_CALM_MS=120;
 
   let activeAccumulatedMs=0;
