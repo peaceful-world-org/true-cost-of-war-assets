@@ -137,7 +137,8 @@
   const annualSpend=2887000000000;
   const secondsPerYear=365.25*24*60*60;
   const spendPerSecond=annualSpend/secondsPerYear;
-  const SESSION_TICK_MS=80;
+  const SESSION_TICK_FAST_MS=16;
+  const SESSION_TICK_CALM_MS=120;
 
   let activeAccumulatedMs=0;
   let activeSince=document.hidden?null:performance.now();
@@ -161,16 +162,18 @@
   function formatSessionSpend(value){
     const abs=Math.max(0,Number(value)||0);
     const locale=lang==='ru'?'ru-RU':'en-US';
+    if(abs<1e6){
+      return '$ '+new Intl.NumberFormat(locale,{maximumFractionDigits:0}).format(abs);
+    }
     const specs=lang==='ru'
-      ? [[1e12,'трлн'],[1e9,'млрд'],[1e6,'млн'],[1e3,'тыс.']]
-      : [[1e12,'tn'],[1e9,'bn'],[1e6,'m'],[1e3,'k']];
+      ? [[1e12,'трлн'],[1e9,'млрд'],[1e6,'млн']]
+      : [[1e12,'tn'],[1e9,'bn'],[1e6,'m']];
     for(const [scale,suffix] of specs){
       if(abs>=scale){
         const scaled=abs/scale;
-        const digits=scaled<100?2:scaled<1000?1:0;
         return '$ '+new Intl.NumberFormat(locale,{
-          minimumFractionDigits:digits,
-          maximumFractionDigits:digits
+          minimumFractionDigits:1,
+          maximumFractionDigits:1
         }).format(scaled)+' '+suffix;
       }
     }
@@ -195,13 +198,34 @@
     postSessionTick();
   }
 
+  let sessionTimer=null;
+
+  function nextSessionDelay(){
+    const value=spendPerSecond*(activeElapsedMs()/1000);
+    return value<1e6?SESSION_TICK_FAST_MS:SESSION_TICK_CALM_MS;
+  }
+
+  function scheduleSessionCounter(){
+    if(sessionTimer!==null){
+      clearTimeout(sessionTimer);
+      sessionTimer=null;
+    }
+    if(document.hidden) return;
+    sessionTimer=setTimeout(()=>{
+      sessionTimer=null;
+      updateSessionCounter();
+      scheduleSessionCounter();
+    },nextSessionDelay());
+  }
+
   document.addEventListener('visibilitychange',()=>{
     setViewingActive(!document.hidden);
     updateSessionCounter();
+    scheduleSessionCounter();
   });
 
-  const sessionInterval=setInterval(updateSessionCounter,SESSION_TICK_MS);
   updateSessionCounter();
+  scheduleSessionCounter();
 
   const viewSwitch=document.createElement('nav');
   viewSwitch.id='pw-tcow-parent-view-switch';
@@ -376,5 +400,7 @@
   setTimeout(requestState,3000);
   setTimeout(syncFloatingVisibility,300);
 
-  window.addEventListener('pagehide',()=>clearInterval(sessionInterval),{once:true});
+  window.addEventListener('pagehide',()=>{
+    if(sessionTimer!==null) clearTimeout(sessionTimer);
+  },{once:true});
 })();
