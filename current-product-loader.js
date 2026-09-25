@@ -34,7 +34,8 @@
     overflow:'hidden',
     minHeight:'500px',
     background:'transparent',
-    display:'block'
+    display:'block',
+    overflowAnchor:'none'
   });
 
   const chromeStyle=document.createElement('style');
@@ -236,15 +237,43 @@
     return overviewSrc+'&sessionMs='+Math.round(activeElapsedMs());
   }
 
+  let pendingViewTopReset=false;
+
+  function viewTopY(){
+    const rect=iframe.getBoundingClientRect();
+    const headerOffset=mobileHeaderBottom();
+    return Math.max(0,window.scrollY+rect.top-headerOffset-8);
+  }
+
+  function resetViewScroll(){
+    const top=viewTopY();
+    window.scrollTo({top,left:window.scrollX,behavior:'auto'});
+    iframe.dataset.pwViewScrollReset=String(Math.round(top));
+    syncFloatingVisibility();
+  }
+
+  function switchView(view){
+    const normalized=view==='details'?'details':'overview';
+    const currentView=viewSwitch.dataset.pwActiveView||'overview';
+    if(normalized===currentView) return;
+
+    pendingViewTopReset=true;
+    setActiveView(normalized);
+
+    // The iframe is auto-heighted inside the Tilda page, so the page itself owns
+    // the scroll position. Reset the parent scroll before swapping documents;
+    // otherwise the same page offset lands halfway through the next view.
+    resetViewScroll();
+    iframe.src=normalized==='details'?detailsSrc:overviewUrl();
+    requestAnimationFrame(resetViewScroll);
+  }
+
   function makeViewButton(view,label){
     const button=document.createElement('button');
     button.type='button';
     button.dataset.view=view;
     button.textContent=label;
-    button.addEventListener('click',()=>{
-      setActiveView(view);
-      iframe.src=view==='details'?detailsSrc:overviewUrl();
-    });
+    button.addEventListener('click',()=>switchView(view));
     viewSwitch.appendChild(button);
     return button;
   }
@@ -384,6 +413,16 @@
     setTimeout(requestState,80);
     setTimeout(requestState,220);
     setTimeout(requestState,650);
+
+    if(pendingViewTopReset){
+      // Re-assert the top position after navigation in case mobile scroll
+      // anchoring or iframe replacement adjusted the outer document.
+      resetViewScroll();
+      requestAnimationFrame(resetViewScroll);
+      setTimeout(resetViewScroll,80);
+      pendingViewTopReset=false;
+    }
+
     setTimeout(syncFloatingVisibility,0);
   });
 
