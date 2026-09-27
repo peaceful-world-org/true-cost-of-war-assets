@@ -340,9 +340,7 @@
 
     let counterVisible=false;
     if(activeView==='details'){
-      // Details is a long-form reading surface. Keep the session clock running
-      // in the parent, but do not float a live counter over the research text.
-      counterVisible=false;
+      counterVisible=rect.top<-240&&overlapsViewport;
     }else if(awaitingOverviewGeometry){
       counterVisible=sessionCounter.classList.contains('is-visible')&&overlapsViewport;
     }else if(Number.isFinite(latestSessionCardBottom)){
