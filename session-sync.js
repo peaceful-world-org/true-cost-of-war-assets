@@ -64,15 +64,10 @@
     const viewSwitch=document.querySelector('#pw-tcow-parent-view-switch');
     const activeView=viewSwitch?.dataset?.pwActiveView||'overview';
 
-    // The floating session counter is an Overview storytelling device.
-    // Details keeps the clock alive for continuity, but stays visually quiet.
-    if(activeView!=='overview'){
-      counter.classList.remove('is-visible');
-      counter.dataset.pwLiveVisible='false';
-      counter.dataset.pwVisibilityOwner='session-sync-details-hidden';
-      return;
-    }
-    if(!Number.isFinite(latestSessionCardBottom)) return;
+    // Details has no inline while-viewing card, so retain the loader's existing
+    // Details threshold. Overview uses a true handoff: the floating counter
+    // appears only after the inline counter has passed behind the sticky header.
+    if(activeView!=='overview'||!Number.isFinite(latestSessionCardBottom)) return;
 
     const iframeRect=iframe.getBoundingClientRect();
     const overlapsViewport=iframeRect.bottom>120&&iframeRect.top<(window.innerHeight-80);
